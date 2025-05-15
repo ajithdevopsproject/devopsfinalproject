@@ -1,48 +1,66 @@
 pipeline {
     agent any
+
     environment {
-        DEV_REPO = "ajithdocgym/dev"
-        PROD_REPO = "ajithdocgym/prod"
+        DOCKERHUB_CREDENTIALS = credentials('8bbedcc6-7f8c-4fb7-9133-797f53bc3d44') // Replace with your Jenkins DockerHub credential ID
+        IMAGE_NAME = "ajithdocgym/dev"
         IMAGE_TAG = "latest"
-        BRANCH_NAME = "dev"  // Explicitly set branch name to fix null issue
     }
+
     stages {
         stage('Checkout') {
             steps {
-                git branch: "${BRANCH_NAME}", url: 'https://github.com/ajithdevopsproject/devopsfinalproject.git'
+                // Checkout code from GitHub (your repo & branch)
+                git branch: 'dev',
+                    url: 'https://github.com/ajithdevopsproject/devopsfinalproject.git',
+                    credentialsId: '' // Add if private repo
             }
         }
-        stage('Build Image') {
+
+        stage('Debug Workspace') {
+            steps {
+                echo "Listing files in workspace root:"
+                sh 'ls -la'
+            }
+        }
+
+        stage('Build Docker Image') {
             steps {
                 script {
-                    dockerImage = docker.build("${DEV_REPO}:${IMAGE_TAG}")
+                    // Build docker image using current directory (repo root)
+                    sh "docker build -t ${IMAGE_NAME}:${IMAGE_TAG} ."
                 }
             }
         }
+
+        stage('Login to Docker Hub') {
+            steps {
+                script {
+                    // Login to Docker Hub using stored credentials
+                    sh "echo ${DOCKERHUB_CREDENTIALS_PSW} | docker login -u ${DOCKERHUB_CREDENTIALS_USR} --password-stdin"
+                }
+            }
+        }
+
         stage('Push to Docker Hub') {
             steps {
                 script {
-                    docker.withRegistry('', 'dockerhub-credentials') {
-                        if (BRANCH_NAME == 'dev') {
-                            dockerImage.push()
-                        } else if (BRANCH_NAME == 'master') {
-                            dockerImage.tag("${PROD_REPO}:${IMAGE_TAG}")
-                            dockerImage.push("${PROD_REPO}:${IMAGE_TAG}")
-                        }
-                    }
+                    sh "docker push ${IMAGE_NAME}:${IMAGE_TAG}"
                 }
             }
         }
-        stage('Deploy') {
-            when {
-                expression { return BRANCH_NAME == 'dev' }
-            }
-            steps {
-                sh './deploy.sh'
-            }
-        }
     }
-    triggers {
-        githubPush()
+
+    post {
+        always {
+            // Clean workspace after build
+            cleanWs()
+        }
+        failure {
+            echo 'Build failed. Check logs for errors.'
+        }
+        success {
+            echo 'Build and push successful!'
+        }
     }
 }
