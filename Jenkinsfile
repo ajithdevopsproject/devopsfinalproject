@@ -6,6 +6,14 @@ pipeline {
         IMAGE_NAME = "ajithdocgym/dev"
         IMAGE_TAG = "latest"
     }
+     stages {
+        stage('Checkout') {
+            steps {
+                git url: 'https://github.com/ajithdevopsproject/devopsfinalproject.git',
+                    branch: 'dev',
+                    credentialsId: 'github-pat' // Use the ID you set in Jenkins Credentials
+            }
+        }
 
     stages {
         stage('Checkout') {
