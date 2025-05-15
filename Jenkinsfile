@@ -4,11 +4,12 @@ pipeline {
         DEV_REPO = "ajithdocgym/dev"
         PROD_REPO = "ajithdocgym/prod"
         IMAGE_TAG = "latest"
+        BRANCH_NAME = "dev"  // Explicitly set branch name to fix null issue
     }
     stages {
         stage('Checkout') {
             steps {
-                git branch: "${env.BRANCH_NAME}", url: 'https://github.com/ajithdevopsproject/devopsfinalproject.git'
+                git branch: "${BRANCH_NAME}", url: 'https://github.com/ajithdevopsproject/devopsfinalproject.git'
             }
         }
         stage('Build Image') {
@@ -22,9 +23,9 @@ pipeline {
             steps {
                 script {
                     docker.withRegistry('', 'dockerhub-credentials') {
-                        if (env.BRANCH_NAME == 'dev') {
+                        if (BRANCH_NAME == 'dev') {
                             dockerImage.push()
-                        } else if (env.BRANCH_NAME == 'master') {
+                        } else if (BRANCH_NAME == 'master') {
                             dockerImage.tag("${PROD_REPO}:${IMAGE_TAG}")
                             dockerImage.push("${PROD_REPO}:${IMAGE_TAG}")
                         }
@@ -34,7 +35,7 @@ pipeline {
         }
         stage('Deploy') {
             when {
-                branch 'dev'
+                expression { return BRANCH_NAME == 'dev' }
             }
             steps {
                 sh './deploy.sh'
