@@ -2,7 +2,7 @@ FROM ubuntu:22.04
 
 ENV DEBIAN_FRONTEND=noninteractive
 
-# Install necessary packages
+# Install dependencies
 RUN apt-get update && apt-get install -y \
     nginx \
     wget \
@@ -15,9 +15,9 @@ RUN apt-get update && apt-get install -y \
     ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
-# Create Prometheus user and directories
+# Create necessary directories and Prometheus user
 RUN useradd --no-create-home --shell /bin/false prometheus && \
-    mkdir /etc/prometheus /var/lib/prometheus
+    mkdir -p /etc/prometheus /etc/alertmanager /var/lib/prometheus
 
 # Install Prometheus
 RUN wget https://github.com/prometheus/prometheus/releases/download/v2.51.2/prometheus-2.51.2.linux-amd64.tar.gz && \
@@ -35,26 +35,33 @@ RUN wget https://github.com/prometheus/alertmanager/releases/download/v0.27.0/al
     mv alertmanager-0.27.0.linux-amd64/amtool /usr/local/bin/ && \
     rm -rf alertmanager-0.27.0.linux-amd64*
 
-# ✅ Install Grafana using official APT repo instead of .deb
-RUN apt-get update && apt-get install -y \
-    gnupg2 \
-    curl \
-    && mkdir -p /etc/apt/keyrings && \
+# Install Grafana using APT repository
+RUN apt-get update && apt-get install -y gnupg2 curl && \
+    mkdir -p /etc/apt/keyrings && \
     curl -fsSL https://apt.grafana.com/gpg.key | gpg --dearmor -o /etc/apt/keyrings/grafana.gpg && \
     echo "deb [signed-by=/etc/apt/keyrings/grafana.gpg] https://apt.grafana.com stable main" > /etc/apt/sources.list.d/grafana.list && \
     apt-get update && apt-get install -y grafana && \
     rm -rf /var/lib/apt/lists/*
 
-# Copy web and config files
-COPY build/ /var/www/html/
-RUN rm -f /var/www/html/index.nginx-debian.html
+# Remove default nginx config
+RUN rm -f /etc/nginx/sites-enabled/default
 
+# Copy nginx configuration
+COPY nginx/nginx.conf /etc/nginx/nginx.conf
+
+# Copy React static files to NGINX web root
+COPY build/ /var/www/html/
+
+# Copy Prometheus and Alertmanager configs
 COPY prometheus/prometheus.yml /etc/prometheus/
 COPY alertmanager/alertmanager.yml /etc/alertmanager/
+
+# Copy startup script
 COPY start.sh /start.sh
 RUN chmod +x /start.sh
 
-# Expose services: nginx (80), Prometheus (9090), Alertmanager (9093), Grafana (3000)
+# Expose required ports
 EXPOSE 80 9090 9093 3000
 
+# Start all services
 CMD ["/start.sh"]
