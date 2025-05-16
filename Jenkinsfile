@@ -1,5 +1,11 @@
+
 pipeline {
     agent any
+
+    environment {
+        IMAGE = 'ajithdocgym/staticwebmonitering:latest'
+        CONTAINER = 'staticwebmonitering'
+    }
 
     stages {
         stage('Checkout') {
@@ -11,7 +17,7 @@ pipeline {
         stage('Build Docker Image') {
             steps {
                 script {
-                    docker.build('ajithdocgym/staticweb:latest')
+                    docker.build("${IMAGE}")
                 }
             }
         }
@@ -20,16 +26,35 @@ pipeline {
             steps {
                 script {
                     docker.withRegistry('', '8bbedcc6-7f8c-4fb7-9133-797f53bc3d44') {
-                        docker.image('ajithdocgym/staticweb:latest').push()
+                        docker.image("${IMAGE}").push()
                     }
                 }
             }
         }
 
-        stage('Deploy') {
+        stage('Remove Old Container') {
             steps {
-                sh 'docker run -d -p 80:80 --name staticweb ajithdocgym/staticweb:latest'
+                script {
+                    sh '''
+                    docker stop ${CONTAINER} || true
+                    docker rm ${CONTAINER} || true
+                    '''
+                }
             }
+        }
+
+        stage('Deploy New Container') {
+            steps {
+                script {
+                    sh "docker run -d -p 80:80 -p 9090:9090 -p 9093:9093 -p 3000:3000 --name ${CONTAINER} ${IMAGE}"
+                }
+            }
+        }
+    }
+
+    post {
+        always {
+            echo "Pipeline execution completed."
         }
     }
 }
